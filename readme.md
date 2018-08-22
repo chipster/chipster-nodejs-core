@@ -1,11 +1,11 @@
-# Common Chipster libraries for JavaScript
+# Common Chipster libraries for Node.js
 
-https://github.com/chipster/chipster-js-common
+https://github.com/chipster/chipster-nodejs-core
 
 ## Usage
 
 ```bash
-npm install chipster-js-common --save
+npm install chipster-nodejs-core@latest --save
 ```
 
 ## Changes
@@ -13,10 +13,10 @@ npm install chipster-js-common --save
 * Link the local project
 
 ```bash
-cd ~/git/chipster-js-common/
+cd ~/git/chipster-nodejs-core/
 npm link
 cd ~/git/YOUR_PROJECT/
-npm link chipster-js-common
+npm link chipster-nodejs-core
 ```
 
 * Do your changes
@@ -43,9 +43,8 @@ npm install
 npm publish
 ```
 
-* Update the version number in the package.json of your project
-* Install it
+* Install the latest version to your project
 
 ```bash
-npm install
+npm install chipster-nodejs-core@latest
 ```
