@@ -120,6 +120,12 @@ export class RestClient {
       map((resp: any) => JSON.parse(resp).jobId),);
   }
 
+  putJob(sessionId: string, job: Job) {
+    return this.getSessionDbUri().pipe(
+      mergeMap(sessionDbUri => this.putJson(sessionDbUri + '/sessions/' + sessionId + '/jobs/' + job.jobId, this.token, job)),
+    );
+  }
+
 	deleteJob(sessionId: string, jobId: string) {
 	  return this.getSessionDbUri().pipe(
       mergeMap(sessionDbUri => this.deleteWithToken(sessionDbUri + '/sessions/' + sessionId + '/jobs/' + jobId, this.token)));
