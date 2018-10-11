@@ -2,20 +2,32 @@
 import {throwError as observableThrowError, Subject, of, Observable } from 'rxjs';
 
 import {mergeMap, map} from 'rxjs/operators';
-import {RxHR} from "@akanass/rx-http-request";
+import {RxHR, RxHttpRequestResponse} from "@akanass/rx-http-request";
 import { Config } from './config';
 import { Logger } from './logger';
 import { Token, Session, Dataset, Job, Module, Tool, Rule } from "chipster-js-common";
+import { CoreOptions } from 'request';
 
 const restify = require('restify');
 const request = require('request');
 const fs = require('fs');
 const errors = require('restify-errors');
 const YAML = require('yamljs');
+const http = require("http");
+const https = require("https");
 
 const logger = Logger.getLogger(__filename);
 
 export class RestClient {
+
+  readonly agentOptions = {
+    keepAlive: true,
+    maxSockets: 4,
+    keepAliveMsecs: 3000
+  }
+
+  readonly httpAgent = new http.Agent(this.agentOptions);
+  readonly httpsAgent = new https.Agent(this.agentOptions);
 
 	private config;
 
@@ -278,12 +290,40 @@ export class RestClient {
 	}
 
   getServiceLocator(webServer) {
-    return RxHR.get(webServer + '/assets/conf/chipster.yaml').pipe(
+    return this.getPooled(webServer + '/assets/conf/chipster.yaml').pipe(
       map(resp => {
       let body = this.handleResponse(resp);
       let conf = YAML.parse(body);
       return conf['service-locator'];
     }));
+  }
+
+  getPooled(uri: string, options?: CoreOptions): Observable<RxHttpRequestResponse<any>> {
+    // clone before modifying
+    const options2 = Object.assign({}, options);
+    options2.agent = this.getAgent(uri);
+    return RxHR.get(uri, options2);
+  }
+
+  putPooled(uri: string, options?: CoreOptions): Observable<RxHttpRequestResponse<any>> {
+    // clone before modifying
+    const options2 = Object.assign({}, options);
+    options2.agent = this.getAgent(uri);
+    return RxHR.put(uri, options2);
+  }
+
+  postPooled(uri: string, options?: CoreOptions): Observable<RxHttpRequestResponse<any>> {
+    // clone before modifying
+    const options2 = Object.assign({}, options);
+    options2.agent = this.getAgent(uri);
+    return RxHR.post(uri, options2);
+  }
+
+  deletePooled(uri: string, options?: CoreOptions): Observable<RxHttpRequestResponse<any>> {
+    // clone before modifying
+    const options2 = Object.assign({}, options);
+    options2.agent = this.getAgent(uri);
+    return RxHR.delete(uri, options2);
   }
 
 	getJson(uri: string, token: string): Observable<any> {
@@ -308,24 +348,39 @@ export class RestClient {
     return headers;
   }
 
+  getAgent(uri: string) {
+    if (uri.startsWith('https')) {
+      return this.httpsAgent;
+    }
+    return this.httpAgent;
+  }
+
 	get(uri: string, headers?: Object): Observable<string> {
-		let options = {headers: headers};
+    let options = {
+      headers: headers,
+    };
 
 		logger.debug('get()', uri + ' ' + JSON.stringify(options.headers));
 
-		return RxHR.get(uri, options).pipe(map(data => this.handleResponse(data)));
+		return this.getPooled(uri, options).pipe(map(data => this.handleResponse(data)));
 	}
 
   post(uri: string, headers?: Object, body?: Object): Observable<string> {
-    let options = {headers: headers, body: body};
+    let options = {
+      headers: headers,
+      body: body,
+    };
     logger.debug('post()', uri + ' ' + JSON.stringify(options.headers));
-    return RxHR.post(uri, options).pipe(map(data => this.handleResponse(data)));
+    return this.postPooled(uri, options).pipe(map(data => this.handleResponse(data)));
   }
 
   put(uri: string, headers?: Object, body?: Object): Observable<string> {
-    let options = {headers: headers, body: body};
+    let options = {
+      headers: headers,
+      body: body,
+    };
     logger.debug('put()', uri + ' ' + JSON.stringify(options.headers));
-    return RxHR.put(uri, options).pipe(map(data => this.handleResponse(data)));
+    return this.putPooled(uri, options).pipe(map(data => this.handleResponse(data)));
   }
 
   postJson(uri: string, token: string, data: any): Observable<string> {
@@ -345,9 +400,11 @@ export class RestClient {
   }
 
   delete(uri: string, headers?: Object): Observable<any> {
-    let options = {headers: headers};
+    let options = {
+      headers: headers,
+    };
 
-    return RxHR.delete(uri, options);
+    return this.deletePooled(uri, options);
   }
 
   handleResponse(data) {
