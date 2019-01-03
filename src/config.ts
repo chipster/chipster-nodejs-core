@@ -4,7 +4,7 @@ const YAML = require('yamljs');
 
 const logger = Logger.getLogger(__filename);
 const ROOT_PATH = '../../';
-const DEFAULT_CONF_PATH = 'conf/chipster-defaults.yaml';
+const DEFAULT_CONF_PATH = 'src/main/resources/chipster-defaults.yaml';
 const KEY_CONF_PATH = 'conf-path';
 const VARIABLE_PREFIX = 'variable-';
 
