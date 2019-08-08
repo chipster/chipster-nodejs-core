@@ -1,25 +1,26 @@
 {
-    "name": "chipster-nodejs-core",
-    "version": "0.0.7",
-    "private": false,
-    "main": "src/exports.js",
-    "scripts": {
-        "prepare": "tsc"
-    },
-    "dependencies": {
-        "@akanass/rx-http-request": "^3.0.0",
-        "chipster-js-common": "^0.2.0",
-        "restify": "^7.2.1",
-        "rxjs": "6.0.0",
-        "winston": "^2.4.0",
-        "yamljs": "^0.3.0"
-    },
-    "devDependencies": {
-        "@types/node": "~10.1.2",
-        "ts-node": "~5.0.1",
-        "typescript": "~2.7.2"
-    },
-    "engines": {
-        "node": "v0.6.x"
-    }
+  "name": "chipster-nodejs-core",
+  "version": "0.1.0",
+  "private": false,
+  "main": "src/exports.js",
+  "types": "src/*.d.ts",
+  "scripts": {
+    "prepare": "tsc"
+  },
+  "dependencies": {
+    "@akanass/rx-http-request": "^3.3.0",
+    "chipster-js-common": "^0.7.0",
+    "restify": "^8.4.0",
+    "rxjs": "^6.5.2",
+    "winston": "^3.2.1",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^12.7.0",
+    "ts-node": "^8.3.0",
+    "typescript": "^3.5.3"
+  },
+  "engines": {
+    "node": "v0.6.x"
+  }
 }
