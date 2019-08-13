@@ -1,6 +1,6 @@
 {
   "name": "chipster-nodejs-core",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "private": false,
   "main": "src/exports.js",
   "types": "src/*.d.ts",
@@ -12,6 +12,7 @@
     "chipster-js-common": "^0.7.0",
     "restify": "^8.4.0",
     "rxjs": "^6.5.2",
+    "verror": "^1.10.0",
     "winston": "^3.2.1",
     "yamljs": "^0.3.0"
   },
