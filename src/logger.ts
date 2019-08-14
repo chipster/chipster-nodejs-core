@@ -1,9 +1,20 @@
 import { VError } from "verror";
 const path = require("path");
 const { createLogger, format, transports } = require("winston");
-const { combine, timestamp, label, printf, metadata, splat, trace } = format;
+const { combine, timestamp, printf } = format;
 
 export class Logger {
+  static consoleTransoport = new transports.Console({
+    level: "info"
+  });
+  static fileTransport = new transports.File({
+    filename: "logs/chipster.log",
+    level: "info"
+  });
+
+  static loggers = [];
+  static enabledTransports = [Logger.consoleTransoport];
+
   static objectToString(obj) {
     if (obj instanceof Error) {
       // return "(err)" + VError.fullStack(obj);
@@ -20,8 +31,18 @@ export class Logger {
     }
   }
 
-  static getLogger(filepath) {
-    let filename = path.basename(filepath);
+  static addLogFile() {
+    Logger.enabledTransports.push(Logger.fileTransport);
+
+    Logger.loggers.forEach(logger => {
+      logger.configure({
+        transports: Logger.enabledTransports
+      });
+    });
+  }
+
+  static getLogger(sourceCodeFilePath) {
+    let filename = path.basename(sourceCodeFilePath);
 
     const chipsterFormat = printf(info => {
       let message = info.message;
@@ -61,11 +82,14 @@ export class Logger {
       );
     });
 
+    const enabledTransports = [Logger.consoleTransoport];
+
     const logger = createLogger({
       format: combine(timestamp(), chipsterFormat),
-      transports: [new transports.Console()],
+      transports: enabledTransports,
       exitOnError: false
     });
+    Logger.loggers.push(logger);
     return logger;
   }
 }
