@@ -67,6 +67,14 @@ export class RestClient {
     );
   }
 
+  getExampleSessions(app: string): Observable<Session[]> {
+    return this.getSessionDbUri().pipe(
+      mergeMap(sessionDbUri =>
+        this.getJson(sessionDbUri + "/sessions?appId=" + app, this.token)
+      )
+    );
+  }
+
   getSession(sessionId: string): Observable<Session> {
     return this.getSessionDbUri().pipe(
       mergeMap(sessionDbUri =>

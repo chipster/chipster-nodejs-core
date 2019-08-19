@@ -1,9 +1,9 @@
 {
   "name": "chipster-nodejs-core",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": false,
-  "main": "src/exports.js",
-  "types": "src/*.d.ts",
+  "main": "lib/exports.js",
+  "types": "lib/*.d.ts",
   "scripts": {
     "prepare": "tsc"
   },
