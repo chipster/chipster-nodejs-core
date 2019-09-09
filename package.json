@@ -1,6 +1,6 @@
 {
   "name": "chipster-nodejs-core",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": false,
   "main": "lib/exports.js",
   "types": "lib/*.d.ts",
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@akanass/rx-http-request": "^3.3.0",
-    "chipster-js-common": "^0.7.0",
+    "chipster-js-common": "^0.8.1",
     "restify": "^8.4.0",
     "rxjs": "^6.5.2",
     "verror": "^1.10.0",
