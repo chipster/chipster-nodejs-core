@@ -618,7 +618,7 @@ export class RestClient {
 
   responseToError(response) {
     if (this.isClient) {
-      return new Error(
+      const err = new Error(
         response.statusCode +
         " - " +
         response.statusMessage +
@@ -627,6 +627,8 @@ export class RestClient {
         ") " +
         response.request.href
       );
+      err["statusCode"] = response.statusCode;
+      return err;
     } else {
       return new errors.HttpError({
         restCode: response.statusMessage,
