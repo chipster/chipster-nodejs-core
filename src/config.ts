@@ -1,4 +1,4 @@
-import {Logger} from "./logger";
+import { Logger } from "./logger";
 const fs = require('fs');
 const YAML = require('yamljs');
 
@@ -11,8 +11,10 @@ const VARIABLE_PREFIX = 'variable-';
 export class Config {
 
 	public static readonly KEY_URL_BIND_TYPE_SERVICE = 'url-bind-type-service';
-  public static readonly KEY_URL_ADMIN_BIND_TYPE_SERVICE = 'url-admin-bind-type-service';
+	public static readonly KEY_URL_ADMIN_BIND_TYPE_SERVICE = 'url-admin-bind-type-service';
 	public static readonly KEY_URL_INT_SERVICE_LOCATOR = 'url-int-service-locator';
+	public static readonly KEY_SECRET_TYPE_SERVICE = 'service-password-type-service';
+	public static readonly KEY_JWS_ALGORITHM = 'jws-algorithm';
 
 	private static confFileWarnShown = false;
 
@@ -51,7 +53,7 @@ export class Config {
 		let value;
 		if (this.confPath) {
 			let confFile = this.readFile(this.confPath);
-			if (confFile) {				
+			if (confFile) {
 				value = confFile[key];
 			}
 		}

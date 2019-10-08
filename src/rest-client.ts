@@ -55,6 +55,14 @@ export class RestClient {
     );
   }
 
+  getAuthPublicKey(username: string, token: string): Observable<string> {
+    return this.getAuthUri().pipe(
+      mergeMap(authUri =>
+        this.getWithToken(authUri + "/tokens/publicKey", token)
+      )
+    );
+
+  }
   getStatus(host): Observable<any> {
     return this.getJson(host + "/admin/status", this.token);
   }
@@ -172,10 +180,10 @@ export class RestClient {
       mergeMap(sessionDbUri =>
         this.putJson(
           sessionDbUri +
-            "/sessions/" +
-            sessionId +
-            "/datasets/" +
-            dataset.datasetId,
+          "/sessions/" +
+          sessionId +
+          "/datasets/" +
+          dataset.datasetId,
           this.token,
           dataset
         )
@@ -582,27 +590,27 @@ export class RestClient {
         logger.debug(
           "error",
           data.response.statusCode +
-            " " +
-            data.response.statusMessage +
-            " " +
-            data.response.body
+          " " +
+          data.response.statusMessage +
+          " " +
+          data.response.body
         );
         throw this.responseToError(data.response);
       } else {
         logger.error(
           "error",
           data.response.statusCode +
-            " " +
-            data.response.statusMessage +
-            " " +
-            data.response.body
+          " " +
+          data.response.statusMessage +
+          " " +
+          data.response.body
         );
         throw new errors.InternalServerError(
           "request " +
-            data.response.request.method +
-            " " +
-            data.response.request.href +
-            " failed"
+          data.response.request.method +
+          " " +
+          data.response.request.href +
+          " failed"
         );
       }
     }
@@ -612,12 +620,12 @@ export class RestClient {
     if (this.isClient) {
       return new Error(
         response.statusCode +
-          " - " +
-          response.statusMessage +
-          " (" +
-          response.body +
-          ") " +
-          response.request.href
+        " - " +
+        response.statusMessage +
+        " (" +
+        response.body +
+        ") " +
+        response.request.href
       );
     } else {
       return new errors.HttpError({
