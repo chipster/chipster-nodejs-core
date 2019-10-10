@@ -1,5 +1,13 @@
 import { RxHR, RxHttpRequestResponse } from "@akanass/rx-http-request";
-import { Dataset, Job, Module, Rule, Session, Tool } from "chipster-js-common";
+import {
+  Dataset,
+  Job,
+  JobState,
+  Module,
+  Rule,
+  Session,
+  Tool
+} from "chipster-js-common";
 import { CoreOptions } from "request";
 import {
   Observable,
@@ -32,18 +40,31 @@ export class RestClient {
   readonly httpsAgent = new https.Agent(this.agentOptions);
 
   private config;
+  serviceLocatorUri: string;
+  token: string;
 
   constructor(
     private isClient: boolean,
-    public token: string,
-    private serviceLocatorUri?: string
+    token: string,
+    serviceLocatorUri?: string
   ) {
-    if (!isClient) {
+    if (isClient) {
+      this.setServiceLocatorUri(serviceLocatorUri);
+    } else {
       this.config = new Config();
       this.serviceLocatorUri = this.config.get(
         Config.KEY_URL_INT_SERVICE_LOCATOR
       );
     }
+    this.setToken(token);
+  }
+
+  setServiceLocatorUri(uri: string) {
+    this.serviceLocatorUri = uri;
+  }
+
+  setToken(token: string) {
+    this.token = token;
   }
 
   getToken(username: string, password: string): Observable<string> {
@@ -246,6 +267,16 @@ export class RestClient {
           this.token
         )
       )
+    );
+  }
+
+  cancelJob(sessionId: string, jobId: string) {
+    return this.getJob(sessionId, jobId).pipe(
+      mergeMap((job: Job) => {
+        job.state = JobState.Cancelled;
+        job.stateDetail = "";
+        return this.putJob(sessionId, job);
+      })
     );
   }
 
@@ -597,7 +628,7 @@ export class RestClient {
         );
         throw this.responseToError(data.response);
       } else {
-        logger.error(
+        logger.debug(
           "error",
           data.response.statusCode +
           " " +
@@ -635,6 +666,15 @@ export class RestClient {
         statusCode: response.statusCode,
         message: response.body
       });
+    }
+  }
+
+  destroy() {
+    if (this.httpAgent) {
+      this.httpAgent.destroy();
+    }
+    if (this.httpsAgent) {
+      this.httpsAgent.destroy();
     }
   }
 }
