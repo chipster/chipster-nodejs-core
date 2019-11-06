@@ -1,6 +1,6 @@
 {
   "name": "chipster-nodejs-core",
-  "version": "0.2.6",
+  "version": "0.2.8",
   "private": false,
   "main": "lib/exports.js",
   "types": "lib/*.d.ts",

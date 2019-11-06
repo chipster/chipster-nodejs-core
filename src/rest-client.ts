@@ -310,7 +310,7 @@ export class RestClient {
     let subject = new Subject<any>();
     this.getFileBrokerUri().subscribe(fileBrokerUri => {
       request
-        .get(uri)
+        .get(uri, { agent: this.getAgent(uri) })
         .on("response", resp => this.checkForError(resp))
         .on("end", () => {
           subject.next();
@@ -341,10 +341,10 @@ export class RestClient {
   uploadFile(sessionId: string, datasetId: string, file: string) {
     let subject = new Subject<any>();
     this.getFileBrokerUri().subscribe(fileBrokerUri => {
+      const uri =
+        fileBrokerUri + "/sessions/" + sessionId + "/datasets/" + datasetId;
       let req = request
-        .put(
-          fileBrokerUri + "/sessions/" + sessionId + "/datasets/" + datasetId
-        )
+        .put(uri, { agent: this.getAgent(uri) })
         .auth("token", this.token)
         .on("response", resp => this.checkForError(resp))
         .on("end", () => {
