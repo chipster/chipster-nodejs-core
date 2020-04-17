@@ -1,25 +1,30 @@
 {
   "name": "chipster-nodejs-core",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "private": false,
   "main": "lib/exports.js",
   "types": "lib/*.d.ts",
   "scripts": {
     "prepare": "tsc"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chipster/chipster-nodejs-core.git"
+  },
+  "license": "MIT",
   "dependencies": {
     "@akanass/rx-http-request": "^3.3.0",
-    "chipster-js-common": "^0.8.1",
-    "restify": "^8.4.0",
-    "rxjs": "^6.5.2",
+    "chipster-js-common": "^0.8.5",
+    "restify": "^8.5.1",
+    "rxjs": "^6.5.5",
     "verror": "^1.10.0",
     "winston": "^3.2.1",
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
-    "@types/node": "^12.7.0",
-    "ts-node": "^8.3.0",
-    "typescript": "^3.5.3"
+    "@types/node": "^13.11.1",
+    "ts-node": "^8.8.2",
+    "typescript": "^3.8.3"
   },
   "engines": {
     "node": "v0.6.x"
