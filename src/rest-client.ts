@@ -1,4 +1,3 @@
-import { RxHR, RxHttpRequestResponse } from "@akanass/rx-http-request";
 import {
   Dataset,
   Job,
@@ -8,7 +7,6 @@ import {
   Session,
   Tool
 } from "chipster-js-common";
-import { CoreOptions } from "request";
 import {
   Observable,
   of,
@@ -19,25 +17,16 @@ import { map, mergeMap } from "rxjs/operators";
 import { Config } from "./config";
 import { Logger } from "./logger";
 
-const restify = require("restify");
-const request = require("request");
 const fs = require("fs");
 const errors = require("restify-errors");
 const YAML = require("yamljs");
 const http = require("http");
 const https = require("https");
+const util = require("util");
 
 const logger = Logger.getLogger(__filename);
 
 export class RestClient {
-  readonly agentOptions = {
-    keepAlive: true,
-    maxSockets: 4,
-    keepAliveMsecs: 3000
-  };
-
-  readonly httpAgent = new http.Agent(this.agentOptions);
-  readonly httpsAgent = new https.Agent(this.agentOptions);
 
   private config;
   serviceLocatorUri: string;
@@ -48,6 +37,10 @@ export class RestClient {
     token: string,
     serviceLocatorUri?: string
   ) {
+
+    http.globalAgent.keepAlive = true;
+    https.globalAgent.keepAlive = true;
+
     if (isClient) {
       this.setServiceLocatorUri(serviceLocatorUri);
     } else {
@@ -308,16 +301,60 @@ export class RestClient {
 
   getToFile(uri: string, file: string) {
     let subject = new Subject<any>();
-    this.getFileBrokerUri().subscribe(fileBrokerUri => {
-      request
-        .get(uri, { agent: this.getAgent(uri) })
-        .on("response", resp => this.checkForError(resp))
-        .on("end", () => {
+
+    let httpLib = this.getHttp(uri);
+
+    let httpOptions = {
+      headers: this.getBasicAuthHeader("token", this.token),
+      method: "GET",
+    }
+    
+    const req = httpLib.request(uri, httpOptions);
+    req.end();
+
+    req.addListener('response', response => {
+
+      let error = null;
+      let errorBody = "";
+
+      try {
+        this.checkForError(response);
+      } catch (e) {
+        error = e;
+      }
+
+      let writeStream = null;
+
+      response.addListener('data', chunk => {
+        if (error) {
+          errorBody += chunk.toString();
+        } else {
+
+          if (!writeStream) {
+            writeStream = fs.createWriteStream(file);
+          }
+          writeStream.write(chunk);
+        }
+      });
+      response.addListener("end", () => {
+        if (writeStream) {
+          writeStream.end();
+        }
+        if (error) {
+          subject.error(this.responseToError({
+            response: response,
+            body: errorBody,
+            uri: uri,
+          }));
+        } else {
           subject.next();
           subject.complete();
-        })
-        .auth("token", this.token)
-        .pipe(this.getWriteStream(file));
+        }
+      });
+
+      response.on('error', error => {
+        subject.error(error);
+      })
     });
     return subject;
   }
@@ -340,21 +377,59 @@ export class RestClient {
 
   uploadFile(sessionId: string, datasetId: string, file: string) {
     let subject = new Subject<any>();
-    this.getFileBrokerUri().subscribe(fileBrokerUri => {
-      const uri =
-        fileBrokerUri + "/sessions/" + sessionId + "/datasets/" + datasetId;
-      let req = request
-        .put(uri, { agent: this.getAgent(uri) })
-        .auth("token", this.token)
-        .on("response", resp => this.checkForError(resp))
-        .on("end", () => {
-          subject.next(datasetId);
-          subject.complete();
-        });
+    
+    return this.getFileBrokerUri().pipe(
+      mergeMap(fileBrokerUri => {
+        const uri =
+          fileBrokerUri + "/sessions/" + sessionId + "/datasets/" + datasetId;
+        
+        let httpLib = this.getHttp(uri);
+        
+        let httpOptions = {
+          headers: this.getBasicAuthHeader("token", this.token),
+          method: "PUT",
+        }
+        
+        const req = httpLib.request(uri, httpOptions);
 
-      this.getReadStream(file).pipe(req);
-    });
-    return subject;
+        fs.createReadStream(file).pipe(req);
+    
+        req.addListener('response', response => {
+    
+          let error = null;
+          let body = "";
+    
+          try {
+            this.checkForError(response);
+          } catch (e) {
+            error = e;
+          }
+    
+          response.addListener('data', chunk => {
+            body += chunk.toString();            
+          });
+
+          response.addListener("end", () => {
+            req.end();
+            if (error) {
+              subject.error(this.responseToError({
+                response: response,
+                body: body,
+                uri: uri,
+              }));
+            } else {
+              subject.next(datasetId);
+              subject.complete();
+            }
+          });
+    
+          response.on('error', error => {
+            subject.error(error);
+          })
+        });
+        return subject;
+      }),
+    );
   }
 
   getRules(sessionId): Observable<Rule[]> {
@@ -402,7 +477,7 @@ export class RestClient {
 
   checkForError(response: any) {
     if (response.statusCode >= 300) {
-      throw new Error(response.stausCode + " - " + response.statusMessage);
+      throw new Error(response.statusCode + " - " + response.statusMessage);
     }
   }
 
@@ -451,6 +526,10 @@ export class RestClient {
     return this.getJson(this.serviceLocatorUri + "/services", null);
   }
 
+  getInternalServices() {
+    return this.getJson(this.serviceLocatorUri + "/services/internal", this.token);
+  }
+
   getServiceUri(serviceName) {
     return this.getServices().pipe(
       map(services => {
@@ -471,7 +550,7 @@ export class RestClient {
   }
 
   getServiceLocator(webServer) {
-    return this.getPooled(webServer + "/assets/conf/chipster.yaml").pipe(
+    return this.request("GET", webServer + "/assets/conf/chipster.yaml").pipe(
       map(resp => {
         let body = this.handleResponse(resp);
         let conf = YAML.parse(body);
@@ -480,44 +559,83 @@ export class RestClient {
     );
   }
 
-  getPooled(
+  getHttp(uri: string) {
+    if (uri.startsWith("https://")) {
+      return https;
+    } else {
+      return http;
+    }
+  }
+
+  request(
+    method: string,
     uri: string,
-    options?: CoreOptions
-  ): Observable<RxHttpRequestResponse<any>> {
-    // clone before modifying
-    const options2 = Object.assign({}, options);
-    options2.agent = this.getAgent(uri);
-    return RxHR.get(uri, options2);
+    headers?: Object,
+    body?: string,
+  ): Observable<HttpResponse> {
+
+    let subject = new Subject<HttpResponse>();
+
+    let httpLib = this.getHttp(uri);
+
+    const httpOptions = {
+      method: method,
+      headers: headers,
+    }
+    
+    const req = httpLib.request(uri, httpOptions, res => {
+
+      let body = "";
+    
+      res.on('data', d => {
+        body += d;
+      })
+
+      res.on('end', d => {
+        subject.next({
+          uri: uri,
+          response: res,
+          body: body,
+        });
+        subject.complete();
+      })
+    })
+    
+    req.on('error', error => {
+      subject.error(error);
+    })
+    
+    if (body) {
+      req.write(body);
+    }
+    req.end()
+    return subject;
   }
 
   putPooled(
     uri: string,
-    options?: CoreOptions
-  ): Observable<RxHttpRequestResponse<any>> {
-    // clone before modifying
-    const options2 = Object.assign({}, options);
-    options2.agent = this.getAgent(uri);
-    return RxHR.put(uri, options2);
+    headers?: Object,
+    body?: string,
+  ): Observable<HttpResponse> {
+
+    return this.request("PUT", uri, headers, body);
   }
 
   postPooled(
     uri: string,
-    options?: CoreOptions
-  ): Observable<RxHttpRequestResponse<any>> {
-    // clone before modifying
-    const options2 = Object.assign({}, options);
-    options2.agent = this.getAgent(uri);
-    return RxHR.post(uri, options2);
+    headers?: Object,
+    body?: string,
+  ): Observable<HttpResponse> {
+
+    return this.request("POST", uri, headers, body);
   }
 
   deletePooled(
     uri: string,
-    options?: CoreOptions
-  ): Observable<RxHttpRequestResponse<any>> {
-    // clone before modifying
-    const options2 = Object.assign({}, options);
-    options2.agent = this.getAgent(uri);
-    return RxHR.delete(uri, options2);
+    headers?: Object,
+  ): Observable<HttpResponse> {
+
+    return this.request("DELETE", uri, headers);
   }
 
   getJson(uri: string, token: string): Observable<any> {
@@ -547,13 +665,6 @@ export class RestClient {
     return headers;
   }
 
-  getAgent(uri: string) {
-    if (uri.startsWith("https")) {
-      return this.httpsAgent;
-    }
-    return this.httpAgent;
-  }
-
   get(uri: string, headers?: Object): Observable<string> {
     let options = {
       headers: headers
@@ -561,29 +672,26 @@ export class RestClient {
 
     logger.debug("get()", uri + " " + JSON.stringify(options.headers));
 
-    return this.getPooled(uri, options).pipe(
+    return this.request("GET", uri, headers).pipe(
       map(data => this.handleResponse(data))
     );
   }
 
-  post(uri: string, headers?: Object, body?: Object): Observable<string> {
+  post(uri: string, headers?: Object, body?: string): Observable<string> {
     let options = {
       headers: headers,
       body: body
     };
     logger.debug("post()", uri + " " + JSON.stringify(options.headers));
-    return this.postPooled(uri, options).pipe(
+    return this.postPooled(uri, headers, body).pipe(
       map(data => this.handleResponse(data))
     );
   }
 
-  put(uri: string, headers?: Object, body?: Object): Observable<string> {
-    let options = {
-      headers: headers,
-      body: body
-    };
-    logger.debug("put()", uri + " " + JSON.stringify(options.headers));
-    return this.putPooled(uri, options).pipe(
+  put(uri: string, headers?: Object, body?: string): Observable<string> {
+
+    logger.debug("put()", uri + " " + JSON.stringify(headers));
+    return this.putPooled(uri, headers, body).pipe(
       map(data => this.handleResponse(data))
     );
   }
@@ -605,11 +713,9 @@ export class RestClient {
   }
 
   delete(uri: string, headers?: Object): Observable<any> {
-    let options = {
-      headers: headers
-    };
-
-    return this.deletePooled(uri, options);
+    return this.deletePooled(uri, headers).pipe(
+      map(data => this.handleResponse(data))
+    );
   }
 
   handleResponse(data) {
@@ -626,7 +732,7 @@ export class RestClient {
           " " +
           data.response.body
         );
-        throw this.responseToError(data.response);
+        throw this.responseToError(data);
       } else {
         logger.debug(
           "error",
@@ -647,34 +753,37 @@ export class RestClient {
     }
   }
 
-  responseToError(response) {
-    if (this.isClient) {
-      const err = new Error(
-        response.statusCode +
-        " - " +
-        response.statusMessage +
-        " (" +
-        response.body +
-        ") " +
-        response.request.href
-      );
-      err["statusCode"] = response.statusCode;
-      return err;
-    } else {
-      return new errors.HttpError({
-        restCode: response.statusMessage,
-        statusCode: response.statusCode,
-        message: response.body
-      });
-    }
-  }
+  responseToError(httpResponse: HttpResponse) {
 
-  destroy() {
-    if (this.httpAgent) {
-      this.httpAgent.destroy();
+    let statusCode;
+    let statusMessage;
+    let body;
+    let uri;
+
+    if (httpResponse) {
+      uri = httpResponse.uri;
+      body = httpResponse.body;
+      if (httpResponse.response) {
+        statusCode = httpResponse.response.statusCode;
+        statusMessage = httpResponse.response.statusMessage;
+      }
     }
-    if (this.httpsAgent) {
-      this.httpsAgent.destroy();
-    }
+
+    let message = statusCode + " - " + statusMessage + " (" + body + ") " + uri;
+
+    return new errors.HttpError({
+      // for some old version of errors?
+      // restCode: httpResponse.response.statusMessage,
+      statusCode: statusCode,
+      info: {
+        httpResponse: httpResponse,
+      },
+    }, message);
   }
+}
+
+export class HttpResponse {
+  response: any;
+  body: string;
+  uri: string;
 }
