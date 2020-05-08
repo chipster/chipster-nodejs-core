@@ -13,7 +13,7 @@ import {
   Subject,
   throwError as observableThrowError
 } from "rxjs";
-import { map, mergeMap } from "rxjs/operators";
+import { map, mergeMap, tap } from "rxjs/operators";
 import { Config } from "./config";
 import { Logger } from "./logger";
 
@@ -31,6 +31,7 @@ export class RestClient {
   private config;
   serviceLocatorUri: string;
   token: string;
+  services: any;
 
   constructor(
     private isClient: boolean,
@@ -298,140 +299,7 @@ export class RestClient {
       )
     );
   }
-
-  getToFile(uri: string, file: string) {
-    let subject = new Subject<any>();
-
-    let httpLib = this.getHttp(uri);
-
-    let httpOptions = {
-      headers: this.getBasicAuthHeader("token", this.token),
-      method: "GET",
-    }
-    
-    const req = httpLib.request(uri, httpOptions);
-    req.end();
-
-    req.addListener('response', response => {
-
-      let error = null;
-      let errorBody = "";
-
-      try {
-        this.checkForError(response);
-      } catch (e) {
-        error = e;
-      }
-
-      let writeStream = null;
-
-      response.addListener('data', chunk => {
-        if (error) {
-          errorBody += chunk.toString();
-        } else {
-
-          if (!writeStream) {
-            writeStream = fs.createWriteStream(file);
-          }
-          writeStream.write(chunk);
-        }
-      });
-      response.addListener("end", () => {
-        if (writeStream) {
-          writeStream.end();
-        }
-        if (error) {
-          subject.error(this.responseToError({
-            response: response,
-            body: errorBody,
-            uri: uri,
-          }));
-        } else {
-          subject.next();
-          subject.complete();
-        }
-      });
-
-      response.on('error', error => {
-        subject.error(error);
-      })
-    });
-    return subject;
-  }
-
-  getWriteStream(file: string) {
-    if (file === "-") {
-      return process.stdout;
-    } else {
-      return fs.createWriteStream(file);
-    }
-  }
-
-  getReadStream(file: string) {
-    if (file === "-") {
-      return process.stdin;
-    } else {
-      return fs.createReadStream(file);
-    }
-  }
-
-  uploadFile(sessionId: string, datasetId: string, file: string) {
-    let subject = new Subject<any>();
-    
-    return this.getFileBrokerUri().pipe(
-      mergeMap(fileBrokerUri => {
-        const uri =
-          fileBrokerUri + "/sessions/" + sessionId + "/datasets/" + datasetId;
-        
-        let httpLib = this.getHttp(uri);
-        
-        let httpOptions = {
-          headers: this.getBasicAuthHeader("token", this.token),
-          method: "PUT",
-        }
-        
-        const req = httpLib.request(uri, httpOptions);
-
-        fs.createReadStream(file).pipe(req);
-    
-        req.addListener('response', response => {
-    
-          let error = null;
-          let body = "";
-    
-          try {
-            this.checkForError(response);
-          } catch (e) {
-            error = e;
-          }
-    
-          response.addListener('data', chunk => {
-            body += chunk.toString();            
-          });
-
-          response.addListener("end", () => {
-            req.end();
-            if (error) {
-              subject.error(this.responseToError({
-                response: response,
-                body: body,
-                uri: uri,
-              }));
-            } else {
-              subject.next(datasetId);
-              subject.complete();
-            }
-          });
-    
-          response.on('error', error => {
-            subject.error(error);
-          })
-        });
-        return subject;
-      }),
-    );
-  }
-
+  
   getRules(sessionId): Observable<Rule[]> {
     return this.getSessionDbUri().pipe(
       mergeMap(sessionDbUri =>
@@ -523,7 +391,13 @@ export class RestClient {
   }
 
   getServices() {
-    return this.getJson(this.serviceLocatorUri + "/services", null);
+    if (!this.services) {
+      return this.getJson(this.serviceLocatorUri + "/services", null).pipe(
+        tap(services => this.services = services)        
+      );
+    } else {
+      return of(this.services);
+    }
   }
 
   getInternalServices() {
@@ -612,30 +486,140 @@ export class RestClient {
     return subject;
   }
 
-  putPooled(
-    uri: string,
-    headers?: Object,
-    body?: string,
-  ): Observable<HttpResponse> {
+  getToFile(uri: string, file: string) {
+    let subject = new Subject<any>();
 
-    return this.request("PUT", uri, headers, body);
+    let httpLib = this.getHttp(uri);
+
+    let httpOptions = {
+      headers: this.getBasicAuthHeader("token", this.token),
+      method: "GET",
+    }
+    
+    const req = httpLib.request(uri, httpOptions);
+    req.end();
+
+    req.addListener('response', response => {
+
+      let error = null;
+      let errorBody = "";
+
+      try {
+        this.checkForError(response);
+      } catch (e) {
+        error = e;
+      }
+
+      let writeStream = null;
+
+      response.addListener('data', chunk => {
+        if (error) {
+          errorBody += chunk.toString();
+        } else {          
+          if (!writeStream) {
+            // piping output to "head" will cause "EPIPE" error when the head has read enough and closes the pipe
+            writeStream = this.getWriteStream(file).on("error", err => {                
+                subject.error(err);
+            });
+          }
+          writeStream.write(chunk);
+        }
+      });
+      response.addListener("end", () => {
+        if (writeStream) {
+          writeStream.end();
+        }
+        if (error) {
+          subject.error(this.responseToError({
+            response: response,
+            body: errorBody,
+            uri: uri,
+          }));
+        } else {
+          subject.next();
+          subject.complete();
+        }
+      });
+
+      response.on('error', error => {
+        subject.error(error);
+      })
+    });
+    return subject;
   }
 
-  postPooled(
-    uri: string,
-    headers?: Object,
-    body?: string,
-  ): Observable<HttpResponse> {
-
-    return this.request("POST", uri, headers, body);
+  getWriteStream(file: string) {
+    if (file === "-") {      
+      return process.stdout;
+    } else {
+      return fs.createWriteStream(file);
+    }
   }
 
-  deletePooled(
-    uri: string,
-    headers?: Object,
-  ): Observable<HttpResponse> {
+  getReadStream(file: string) {
+    if (file === "-") {
+      return process.stdin;
+    } else {
+      return fs.createReadStream(file);
+    }
+  }
 
-    return this.request("DELETE", uri, headers);
+  uploadFile(sessionId: string, datasetId: string, file: string) {
+    let subject = new Subject<any>();
+    
+    return this.getFileBrokerUri().pipe(
+      mergeMap(fileBrokerUri => {
+        const uri =
+          fileBrokerUri + "/sessions/" + sessionId + "/datasets/" + datasetId;
+        
+        let httpLib = this.getHttp(uri);
+        
+        let httpOptions = {
+          headers: this.getBasicAuthHeader("token", this.token),
+          method: "PUT",
+        }
+        
+        const req = httpLib.request(uri, httpOptions);
+
+        this.getReadStream(file).pipe(req);
+        // fs.createReadStream(file).pipe(req);
+    
+        req.addListener('response', response => {
+    
+          let error = null;
+          let body = "";
+    
+          try {
+            this.checkForError(response);
+          } catch (e) {
+            error = e;
+          }
+    
+          response.addListener('data', chunk => {
+            body += chunk.toString();            
+          });
+
+          response.addListener("end", () => {
+            req.end();
+            if (error) {
+              subject.error(this.responseToError({
+                response: response,
+                body: body,
+                uri: uri,
+              }));
+            } else {
+              subject.next(datasetId);
+              subject.complete();
+            }
+          });
+    
+          response.on('error', error => {
+            subject.error(error);
+          })
+        });
+        return subject;
+      }),
+    );
   }
 
   getJson(uri: string, token: string): Observable<any> {
@@ -683,7 +667,7 @@ export class RestClient {
       body: body
     };
     logger.debug("post()", uri + " " + JSON.stringify(options.headers));
-    return this.postPooled(uri, headers, body).pipe(
+    return this.request("POST", uri, headers, body).pipe(
       map(data => this.handleResponse(data))
     );
   }
@@ -691,7 +675,7 @@ export class RestClient {
   put(uri: string, headers?: Object, body?: string): Observable<string> {
 
     logger.debug("put()", uri + " " + JSON.stringify(headers));
-    return this.putPooled(uri, headers, body).pipe(
+    return this.request("PUT", uri, headers, body).pipe(
       map(data => this.handleResponse(data))
     );
   }
@@ -713,7 +697,7 @@ export class RestClient {
   }
 
   delete(uri: string, headers?: Object): Observable<any> {
-    return this.deletePooled(uri, headers).pipe(
+    return this.request("DELETE", uri, headers).pipe(
       map(data => this.handleResponse(data))
     );
   }
@@ -772,8 +756,6 @@ export class RestClient {
     let message = statusCode + " - " + statusMessage + " (" + body + ") " + uri;
 
     return new errors.HttpError({
-      // for some old version of errors?
-      // restCode: httpResponse.response.statusMessage,
       statusCode: statusCode,
       info: {
         httpResponse: httpResponse,
