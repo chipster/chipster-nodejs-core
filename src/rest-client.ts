@@ -5,7 +5,8 @@ import {
   Module,
   Rule,
   Session,
-  Tool
+  Tool,
+  Service
 } from "chipster-js-common";
 import {
   Observable,
@@ -62,9 +63,18 @@ export class RestClient {
   }
 
   getToken(username: string, password: string): Observable<string> {
-    return this.getAuthUri().pipe(
+
+    let authUri$ = null;
+    if (this.config) {
+      // server
+      authUri$ = this.getInternalAuthUri(username, password);
+    } else {
+      // client
+      authUri$ = this.getAuthUri()
+    }
+    return authUri$.pipe(
       map(authUri => authUri + "/tokens/"),
-      mergeMap(uri =>
+      mergeMap((uri: string) =>
         this.post(uri, this.getBasicAuthHeader(username, password))
       )
     );
@@ -392,7 +402,15 @@ export class RestClient {
 
   getServices() {
     if (!this.services) {
-      return this.getJson(this.serviceLocatorUri + "/services", null).pipe(
+      let services$;
+      if (this.config) {
+        // server
+        services$ = this.getInternalServices();
+      } else {
+        // client        
+        services$ = this.getServicesUncached();
+      }
+      return services$.pipe(
         tap(services => this.services = services)        
       );
     } else {
@@ -400,13 +418,39 @@ export class RestClient {
     }
   }
 
+  getServicesUncached() {
+    logger.info("get public services from " + this.serviceLocatorUri);
+    return this.getJson(this.serviceLocatorUri + "/services", null).pipe(
+      tap(services => this.services = services)        
+    );
+  }
+
   getInternalServices() {
+    logger.info("get internal services from " + this.serviceLocatorUri);
     return this.getJson(this.serviceLocatorUri + "/services/internal", this.token);
+  }
+
+  getInternalAuthUri(username: string, password: string) {
+    logger.info("get internal auth address from " + this.serviceLocatorUri);
+    return this.get(
+      this.serviceLocatorUri + "/services/internal", 
+      this.getBasicAuthHeader(username, password)).pipe(
+        map((data: string) => JSON.parse(data)),
+        map((services: Service[]) => {
+          let auths = services
+            .filter(s => s.role === "auth")
+            .map(s => s.uri);
+          if (auths.length > 0) {
+            return auths[0];
+          }
+          throw new Error("not auths found");
+        })
+      );
   }
 
   getServiceUri(serviceName) {
     return this.getServices().pipe(
-      map(services => {
+      map((services: Service[]) => {
         let service = services.filter(
           service => service.role === serviceName
         )[0];
