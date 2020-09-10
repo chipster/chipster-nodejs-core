@@ -65,12 +65,12 @@ export class RestClient {
   getToken(username: string, password: string): Observable<string> {
 
     let authUri$ = null;
-    if (this.config) {
-      // server
-      authUri$ = this.getInternalAuthUri(username, password);
-    } else {
+    if (this.isClient) {
       // client
       authUri$ = this.getAuthUri()
+    } else {
+      // server
+      authUri$ = this.getInternalAuthUri(username, password);
     }
     return authUri$.pipe(
       map(authUri => authUri + "/tokens/"),
@@ -403,12 +403,12 @@ export class RestClient {
   getServices() {
     if (!this.services) {
       let services$;
-      if (this.config) {
-        // server
-        services$ = this.getInternalServices();
-      } else {
+      if (this.isClient) {
         // client        
         services$ = this.getServicesUncached();
+      } else {
+        // server
+        services$ = this.getInternalServices();
       }
       return services$.pipe(
         tap(services => this.services = services)        
@@ -459,10 +459,8 @@ export class RestClient {
             new errors.InternalServerError("service not found" + serviceName)
           );
         }
-        // the typeService doesn't have up-to-date token for itself, so we don't have access
-        // to the internal URL
-        //return this.isClient ? service.publicUri : service.uri;
-        return service.publicUri;
+
+        return this.isClient ? service.publicUri : service.uri;
       })
     );
   }
