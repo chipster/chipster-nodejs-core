@@ -37,7 +37,8 @@ export class RestClient {
   constructor(
     private isClient: boolean,
     token: string,
-    serviceLocatorUri?: string
+    serviceLocatorUri?: string,
+    private isQuiet = false,
   ) {
 
     http.globalAgent.keepAlive = true;
@@ -52,6 +53,10 @@ export class RestClient {
       );
     }
     this.setToken(token);
+  }
+
+  setQuiet(isQuiet: boolean) {
+    this.isQuiet = isQuiet;
   }
 
   setServiceLocatorUri(uri: string) {
@@ -417,21 +422,30 @@ export class RestClient {
       return of(this.services);
     }
   }
+  
+  /**
+   * write help and progress message on normal verbosity level
+   */
+  info(msg: string) {
+    if(!this.isQuiet) {
+      logger.info("get public services from " + this.serviceLocatorUri);  
+    }
+  }
 
   getServicesUncached() {
-    logger.info("get public services from " + this.serviceLocatorUri);
+    this.info("get public services from " + this.serviceLocatorUri);
     return this.getJson(this.serviceLocatorUri + "/services", null).pipe(
       tap(services => this.services = services)        
     );
   }
 
   getInternalServices() {
-    logger.info("get internal services from " + this.serviceLocatorUri);
+    this.info("get internal services from " + this.serviceLocatorUri);
     return this.getJson(this.serviceLocatorUri + "/services/internal", this.token);
   }
 
   getInternalAuthUri(username: string, password: string) {
-    logger.info("get internal auth address from " + this.serviceLocatorUri);
+    this.info("get internal auth address from " + this.serviceLocatorUri);
     return this.get(
       this.serviceLocatorUri + "/services/internal", 
       this.getBasicAuthHeader(username, password)).pipe(
