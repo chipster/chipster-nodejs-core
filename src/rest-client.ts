@@ -568,19 +568,18 @@ export class RestClient {
 
       let writeStream = null;
 
+      /* Read the response body in case there was an error
+
+      Error responses are small, so it should be fine to read them without backpressure (see the comment about pipe below).
+      */ 
       response.addListener('data', chunk => {
         if (error) {
           errorBody += chunk.toString();
-        } else {          
-          if (!writeStream) {
-            // piping output to "head" will cause "EPIPE" error when the head has read enough and closes the pipe
-            writeStream = this.getWriteStream(file).on("error", err => {                
-                subject.error(err);
-            });
-          }
-          writeStream.write(chunk);
         }
       });
+
+      writeStream = this.getWriteStream(file);
+
       response.addListener("end", () => {
         if (writeStream) {
           writeStream.end();
@@ -599,7 +598,14 @@ export class RestClient {
 
       response.on('error', error => {
         subject.error(error);
-      })
+      });
+
+      /* Read the normal responses with pipe
+
+      Writing the chunks one by one in .addListener('data', ...) would not be a good idea, because we would
+      run out of memory when the writing side is slower. Pipe implements backpressure to slow down the reading.
+      */
+      response.pipe(writeStream);
     });
     return subject;
   }
