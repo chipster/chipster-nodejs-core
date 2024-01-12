@@ -134,8 +134,7 @@ export class RestClient {
     return this.getSessionDbUri().pipe(
       mergeMap(sessionDbUri =>
         this.putJson(sessionDbUri + "/sessions/" + session.sessionId, this.token, session)
-      ),
-      map((resp: any) => JSON.parse(resp).sessionId)
+      )
     );
   }
 
