@@ -130,6 +130,15 @@ export class RestClient {
     );
   }
 
+  putSession(session: Session) {
+    return this.getSessionDbUri().pipe(
+      mergeMap(sessionDbUri =>
+        this.putJson(sessionDbUri + "/sessions/" + session.sessionId, this.token, session)
+      ),
+      map((resp: any) => JSON.parse(resp).sessionId)
+    );
+  }
+
   extractSession(sessionId: string, datasetId: string) {
     return this.getSessionWorkerUri().pipe(
       mergeMap(uri =>
