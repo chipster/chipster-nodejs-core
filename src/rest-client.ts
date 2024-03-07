@@ -15,8 +15,9 @@ import {
   throwError as observableThrowError,
 } from "rxjs";
 import { map, mergeMap, tap } from "rxjs/operators";
-import { Config } from "./config";
-import { Logger } from "./logger";
+import { Config } from "./config.js";
+import { Logger } from "./logger.js";
+import type { ClientRequest } from "http";
 
 const fs = require("fs");
 const errors = require("restify-errors");
@@ -29,7 +30,7 @@ const logger = Logger.getLogger(__filename);
 
 export class RestClient {
   private config;
-  serviceLocatorUri: string;
+  serviceLocatorUri: string | null = null;
   token: string;
   services: any;
 
@@ -42,7 +43,7 @@ export class RestClient {
     http.globalAgent.keepAlive = true;
     https.globalAgent.keepAlive = true;
 
-    if (isClient) {
+    if (isClient && serviceLocatorUri) {
       this.setServiceLocatorUri(serviceLocatorUri);
     } else {
       this.config = new Config();
@@ -50,7 +51,8 @@ export class RestClient {
         Config.KEY_URL_INT_SERVICE_LOCATOR
       );
     }
-    this.setToken(token);
+
+    this.token = token;
   }
 
   setQuiet(isQuiet: boolean) {
@@ -65,7 +67,7 @@ export class RestClient {
     this.token = token;
   }
 
-  getToken(username: string, password: string): Observable<string> {
+  getToken(username: string, password: string): Observable<string | null> {
     let authUri$ = null;
     if (this.isClient) {
       // client
@@ -82,14 +84,14 @@ export class RestClient {
     );
   }
 
-  getAuthPublicKey(username: string, token: string): Observable<string> {
+  getAuthPublicKey(username: string, token: string): Observable<string | null> {
     return this.getAuthUri().pipe(
       mergeMap((authUri) =>
         this.getWithToken(authUri + "/tokens/publicKey", token)
       )
     );
   }
-  getStatus(host): Observable<any> {
+  getStatus(host: string): Observable<any> {
     return this.getJson(host + "/admin/status", this.token);
   }
 
@@ -167,7 +169,7 @@ export class RestClient {
     );
   }
 
-  getDatasets(sessionId): Observable<Dataset[]> {
+  getDatasets(sessionId: string): Observable<Dataset[]> {
     return this.getSessionDbUri().pipe(
       mergeMap((sessionDbUri) => {
         return this.getJson(
@@ -178,7 +180,7 @@ export class RestClient {
     );
   }
 
-  getDataset(sessionId, datasetId): Observable<Dataset> {
+  getDataset(sessionId: string, datasetId: string): Observable<Dataset> {
     return this.getSessionDbUri().pipe(
       mergeMap((sessionDbUri) => {
         return this.getJson(
@@ -229,7 +231,7 @@ export class RestClient {
     );
   }
 
-  getJobs(sessionId): Observable<Job[]> {
+  getJobs(sessionId: string): Observable<Job[]> {
     return this.getSessionDbUri().pipe(
       mergeMap((sessionDbUri) => {
         return this.getJson(
@@ -240,7 +242,7 @@ export class RestClient {
     );
   }
 
-  getJob(sessionId, jobId): Observable<Job> {
+  getJob(sessionId: string, jobId: string): Observable<Job> {
     return this.getSessionDbUri().pipe(
       mergeMap((sessionDbUri) => {
         return this.getJson(
@@ -305,7 +307,7 @@ export class RestClient {
     );
   }
 
-  getTool(toolId): Observable<Tool> {
+  getTool(toolId: string): Observable<Tool> {
     return this.getToolboxUri().pipe(
       mergeMap((uri) => this.getJson(uri + "/tools/" + toolId, null)),
       map((toolBoxTool: any) => toolBoxTool.sadlDescription)
@@ -323,7 +325,7 @@ export class RestClient {
     );
   }
 
-  getRules(sessionId): Observable<Rule[]> {
+  getRules(sessionId: string): Observable<Rule[]> {
     return this.getSessionDbUri().pipe(
       mergeMap((sessionDbUri) =>
         this.getJson(
@@ -372,7 +374,7 @@ export class RestClient {
     }
   }
 
-  getFile(sessionId, datasetId, maxLength) {
+  getFile(sessionId: string, datasetId: string, maxLength: number) {
     // Range request 0-0 would produce 416 - Range Not Satifiable
     if (maxLength === 0) {
       return of("");
@@ -459,7 +461,13 @@ export class RestClient {
       this.serviceLocatorUri + "/services/internal",
       this.getBasicAuthHeader(username, password)
     ).pipe(
-      map((data: string) => JSON.parse(data)),
+      map((data: string | null) => {
+        if (data != null) {
+          return JSON.parse(data);
+        } else {
+          throw new Error("response is null");
+        }
+      }),
       map((services: Service[]) => {
         let auths = services.filter((s) => s.role === "auth").map((s) => s.uri);
         if (auths.length > 0) {
@@ -470,7 +478,7 @@ export class RestClient {
     );
   }
 
-  getServiceUri(serviceName) {
+  getServiceUri(serviceName: string) {
     return this.getServices().pipe(
       map((services: Service[]) => {
         let service = services.filter(
@@ -487,7 +495,7 @@ export class RestClient {
     );
   }
 
-  getServiceLocator(webServer) {
+  getServiceLocator(webServer: string) {
     return this.request("GET", webServer + "/assets/conf/chipster.yaml").pipe(
       map((resp) => {
         let body = this.handleResponse(resp);
@@ -520,7 +528,7 @@ export class RestClient {
       headers: headers,
     };
 
-    const req = httpLib.request(uri, httpOptions, (res) => {
+    const req = httpLib.request(uri, httpOptions, (res: ClientRequest) => {
       let body = "";
 
       res.on("data", (d) => {
@@ -537,7 +545,7 @@ export class RestClient {
       });
     });
 
-    req.on("error", (error) => {
+    req.on("error", (error: Error) => {
       subject.error(error);
     });
 
@@ -561,8 +569,8 @@ export class RestClient {
     const req = httpLib.request(uri, httpOptions);
     req.end();
 
-    req.addListener("response", (response) => {
-      let error = null;
+    req.addListener("response", (response: ClientRequest) => {
+      let error: any | null = null;
       let errorBody = "";
 
       try {
@@ -571,7 +579,7 @@ export class RestClient {
         error = e;
       }
 
-      let writeStream = null;
+      let writeStream: any = null;
 
       /* Read the response body in case there was an error
 
@@ -653,8 +661,8 @@ export class RestClient {
         this.getReadStream(file).pipe(req);
         // fs.createReadStream(file).pipe(req);
 
-        req.addListener("response", (response) => {
-          let error = null;
+        req.addListener("response", (response: ClientRequest) => {
+          let error: any = null;
           let body = "";
 
           try {
@@ -692,15 +700,23 @@ export class RestClient {
     );
   }
 
-  getJson(uri: string, token: string): Observable<any> {
-    return this.getWithToken(uri, token).pipe(map((data) => JSON.parse(data)));
+  getJson(uri: string, token: string | null): Observable<any> {
+    return this.getWithToken(uri, token).pipe(
+      map((data) => {
+        if (data != null) {
+          return JSON.parse(data);
+        } else {
+          return null;
+        }
+      })
+    );
   }
 
   getWithToken(
     uri: string,
-    token: string,
+    token: string | null,
     headers?: Object
-  ): Observable<string> {
+  ): Observable<string | null> {
     if (token) {
       return this.get(uri, this.getBasicAuthHeader("token", token, headers));
     } else {
@@ -708,7 +724,7 @@ export class RestClient {
     }
   }
 
-  getBasicAuthHeader(username, password, headers?) {
+  getBasicAuthHeader(username: string, password: string, headers?: any) {
     if (!headers) {
       headers = {};
     }
@@ -719,7 +735,7 @@ export class RestClient {
     return headers;
   }
 
-  get(uri: string, headers?: Object): Observable<string> {
+  get(uri: string, headers?: Object): Observable<string | null> {
     let options = {
       headers: headers,
     };
@@ -731,7 +747,11 @@ export class RestClient {
     );
   }
 
-  post(uri: string, headers?: Object, body?: string): Observable<string> {
+  post(
+    uri: string,
+    headers?: Object,
+    body?: string
+  ): Observable<string | null> {
     let options = {
       headers: headers,
       body: body,
@@ -742,20 +762,20 @@ export class RestClient {
     );
   }
 
-  put(uri: string, headers?: Object, body?: string): Observable<string> {
+  put(uri: string, headers?: Object, body?: string): Observable<string | null> {
     logger.debug("put()", uri + " " + JSON.stringify(headers));
     return this.request("PUT", uri, headers, body).pipe(
       map((data) => this.handleResponse(data))
     );
   }
 
-  postJson(uri: string, token: string, data: any): Observable<string> {
+  postJson(uri: string, token: string, data: any): Observable<string | null> {
     let headers = this.getBasicAuthHeader("token", token);
     headers["content-type"] = "application/json";
     return this.post(uri, headers, JSON.stringify(data));
   }
 
-  putJson(uri: string, token: string, data: any): Observable<string> {
+  putJson(uri: string, token: string, data: any): Observable<string | null> {
     let headers = this.getBasicAuthHeader("token", token);
     headers["content-type"] = "application/json";
     return this.put(uri, headers, JSON.stringify(data));
@@ -771,7 +791,7 @@ export class RestClient {
     );
   }
 
-  handleResponse(data) {
+  handleResponse(data: HttpResponse): string | null {
     if (data.response.statusCode >= 200 && data.response.statusCode <= 299) {
       logger.debug("response", data.body);
       return data.body;
@@ -837,6 +857,6 @@ export class RestClient {
 
 export class HttpResponse {
   response: any;
-  body: string;
-  uri: string;
+  body: string | null = null;
+  uri: string | null = null;
 }

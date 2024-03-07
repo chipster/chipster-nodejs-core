@@ -1,16 +1,15 @@
 {
   "include": ["src/**/*"],
   "compilerOptions": {
+    // recommended options in https://www.typescriptlang.org/docs/handbook/modules/guides/choosing-compiler-options.html#im-writing-a-library
+    "module": "node16",
+    "target": "es2020",
+    "strict": true,
+    "verbatimModuleSyntax": true,
     "declaration": true,
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "target": "es5",
-    "lib": [
-      // rxjs references staff from DOM
-      "dom",
-      "es5",
-      "es2016"
-    ],
+    "sourceMap": true,
+    "declarationMap": true,
+    // keep generated files in separate folder
     "outDir": "./lib"
   }
 }

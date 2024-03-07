@@ -1,21 +1,21 @@
-import { VError } from "verror";
-const path = require("path");
-const { createLogger, format, transports } = require("winston");
+import VError from "verror";
+import path from "path";
+import { createLogger, format, transports } from "winston";
 const { combine, timestamp, printf } = format;
 
 export class Logger {
   static consoleTransoport = new transports.Console({
-    level: "info"
+    level: "info",
   });
   static fileTransport = new transports.File({
     filename: "logs/chipster.log",
-    level: "info"
+    level: "info",
   });
 
-  static loggers = [];
+  static loggers: Logger[] = [];
   static enabledTransports = [Logger.consoleTransoport];
 
-  static objectToString(obj) {
+  static objectToString(obj: any) {
     if (obj instanceof Error) {
       // return "(err)" + VError.fullStack(obj);
       return VError.fullStack(obj) + "\n";
@@ -32,19 +32,19 @@ export class Logger {
   }
 
   static addLogFile() {
-    Logger.enabledTransports.push(Logger.fileTransport);
+    Logger.enabledTransports.push(<any>Logger.fileTransport);
 
-    Logger.loggers.forEach(logger => {
+    Logger.loggers.forEach((logger: any) => {
       logger.configure({
-        transports: Logger.enabledTransports
+        transports: Logger.enabledTransports,
       });
     });
   }
 
-  static getLogger(sourceCodeFilePath) {
+  static getLogger(sourceCodeFilePath: string) {
     let filename = path.basename(sourceCodeFilePath);
 
-    const chipsterFormat = printf(info => {
+    const chipsterFormat = printf((info: any) => {
       let message = info.message;
       // no idea why "info instanceof VError" doesn't work, but luckily VError.fullStack() works just fine for regular Errors
       if (info instanceof Error) {
@@ -65,7 +65,7 @@ export class Logger {
       // logger.error("the answer is", 3)
       const metaArray = info[Symbol.for("splat")] || [];
       const metaString = metaArray
-        .map(meta => Logger.objectToString(meta))
+        .map((meta: any) => Logger.objectToString(meta))
         .join(" ");
 
       return (
@@ -87,7 +87,7 @@ export class Logger {
     const logger = createLogger({
       format: combine(timestamp(), chipsterFormat),
       transports: enabledTransports,
-      exitOnError: false
+      exitOnError: false,
     });
     Logger.loggers.push(logger);
     return logger;
