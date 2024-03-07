@@ -17,15 +17,15 @@ import {
 import { map, mergeMap, tap } from "rxjs/operators";
 import { Config } from "./config.js";
 import { Logger } from "./logger.js";
-import type { ClientRequest } from "http";
+import type { ClientRequest, IncomingMessage, RequestOptions } from "http";
 import { fileURLToPath } from "url";
 
-const fs = require("fs");
-const errors = require("restify-errors");
-const YAML = require("yamljs");
-const http = require("http");
-const https = require("https");
-const util = require("util");
+import fs from "fs";
+import errors from "restify-errors";
+import YAML from "yamljs";
+import http from "http";
+import https from "https";
+import util from "util";
 
 const logger = Logger.getLogger(fileURLToPath(import.meta.url));
 
@@ -41,8 +41,8 @@ export class RestClient {
     serviceLocatorUri?: string,
     private isQuiet = false
   ) {
-    http.globalAgent.keepAlive = true;
-    https.globalAgent.keepAlive = true;
+    (http.globalAgent as any).keepAlive = true;
+    (https.globalAgent as any).keepAlive = true;
 
     if (isClient && serviceLocatorUri) {
       this.setServiceLocatorUri(serviceLocatorUri);
@@ -500,8 +500,12 @@ export class RestClient {
     return this.request("GET", webServer + "/assets/conf/chipster.yaml").pipe(
       map((resp) => {
         let body = this.handleResponse(resp);
-        let conf = YAML.parse(body);
-        return conf["service-locator"];
+        if (body != null) {
+          let conf = YAML.parse(body);
+          return conf["service-locator"];
+        } else {
+          return null;
+        }
       })
     );
   }
@@ -524,19 +528,19 @@ export class RestClient {
 
     let httpLib = this.getHttp(uri);
 
-    const httpOptions = {
+    const httpOptions: any = {
       method: method,
       headers: headers,
     };
 
-    const req = httpLib.request(uri, httpOptions, (res: ClientRequest) => {
+    const req = httpLib.request(uri, httpOptions, (res: IncomingMessage) => {
       let body = "";
 
       res.on("data", (d) => {
         body += d;
       });
 
-      res.on("end", (d) => {
+      res.on("end", () => {
         subject.next({
           uri: uri,
           response: res,
