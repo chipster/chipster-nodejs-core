@@ -1,8 +1,10 @@
 import { Logger } from "./logger.js";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import YAML from "yamljs";
 
-const logger = Logger.getLogger(__filename);
+const logger = Logger.getLogger(fileURLToPath(import.meta.url));
+
 const ROOT_PATH = "../../";
 const DEFAULT_CONF_PATH = "src/main/resources/chipster-defaults.yaml";
 const KEY_CONF_PATH = "conf-path";

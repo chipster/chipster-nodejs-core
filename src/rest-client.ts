@@ -18,6 +18,7 @@ import { map, mergeMap, tap } from "rxjs/operators";
 import { Config } from "./config.js";
 import { Logger } from "./logger.js";
 import type { ClientRequest } from "http";
+import { fileURLToPath } from "url";
 
 const fs = require("fs");
 const errors = require("restify-errors");
@@ -26,7 +27,7 @@ const http = require("http");
 const https = require("https");
 const util = require("util");
 
-const logger = Logger.getLogger(__filename);
+const logger = Logger.getLogger(fileURLToPath(import.meta.url));
 
 export class RestClient {
   private config;
