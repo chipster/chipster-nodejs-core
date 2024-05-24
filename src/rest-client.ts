@@ -651,8 +651,17 @@ export class RestClient {
 
     return this.getFileBrokerUri().pipe(
       mergeMap((fileBrokerUri) => {
+        // s3-storage needs file size at the moment
+        let fileSize = fs.statSync(file).size;
+
         const uri =
-          fileBrokerUri + "/sessions/" + sessionId + "/datasets/" + datasetId;
+          fileBrokerUri +
+          "/sessions/" +
+          sessionId +
+          "/datasets/" +
+          datasetId +
+          "?flowTotalSize=" +
+          fileSize;
 
         let httpLib = this.getHttp(uri);
 
