@@ -38,13 +38,13 @@ export class RestClient {
   constructor(
     private isClient: boolean,
     token: string,
-    serviceLocatorUri?: string,
+    serviceLocatorUri: string,
     private isQuiet = false
   ) {
     (http.globalAgent as any).keepAlive = true;
     (https.globalAgent as any).keepAlive = true;
 
-    if (isClient && serviceLocatorUri) {
+    if (isClient) {
       this.setServiceLocatorUri(serviceLocatorUri);
     } else {
       this.config = new Config();

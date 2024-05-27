@@ -1,6 +1,7 @@
 import VError from "verror";
 import path from "path";
-import { createLogger, format, transports } from "winston";
+import winston, { createLogger, format, transports } from "winston";
+import type { StreamTransportInstance } from "winston/lib/winston/transports/index.js";
 const { combine, timestamp, printf } = format;
 
 export class Logger {
@@ -41,7 +42,7 @@ export class Logger {
     });
   }
 
-  static getLogger(sourceCodeFilePath: string) {
+  static getLogger(sourceCodeFilePath: string, logFile?: string) {
     let filename = path.basename(sourceCodeFilePath);
 
     const chipsterFormat = printf((info: any) => {
@@ -82,7 +83,15 @@ export class Logger {
       );
     });
 
-    const enabledTransports = [Logger.consoleTransoport];
+    const enabledTransports: StreamTransportInstance[] = [
+      Logger.consoleTransoport,
+    ];
+
+    if (logFile) {
+      enabledTransports.push(
+        new winston.transports.File({ filename: logFile })
+      );
+    }
 
     const logger = createLogger({
       format: combine(timestamp(), chipsterFormat),
