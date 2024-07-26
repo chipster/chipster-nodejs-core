@@ -14,10 +14,10 @@ import {
   Subject,
   throwError as observableThrowError,
 } from "rxjs";
-import { map, mergeMap, tap } from "rxjs/operators";
+import { catchError, map, mergeMap, tap } from "rxjs/operators";
 import { Config } from "./config.js";
 import { Logger } from "./logger.js";
-import type { ClientRequest, IncomingMessage, RequestOptions } from "http";
+import type { ClientRequest, IncomingMessage } from "http";
 import { fileURLToPath } from "url";
 
 import fs from "fs";
@@ -25,7 +25,6 @@ import errors from "restify-errors";
 import YAML from "yamljs";
 import http from "http";
 import https from "https";
-import util from "util";
 
 const logger = Logger.getLogger(fileURLToPath(import.meta.url));
 
@@ -41,8 +40,26 @@ export class RestClient {
     serviceLocatorUri: string,
     private isQuiet = false
   ) {
-    (http.globalAgent as any).keepAlive = true;
-    (https.globalAgent as any).keepAlive = true;
+    /*
+    Requests are failing randomly with error "socket hung up" when keepAlive is enabled.
+    Only observed when https connections through ha-proxy (in Rahti 2) were used.
+
+    Seems to be a known problem in the NodeJS http/https library:
+    https://github.com/node-fetch/node-fetch/issues/1735
+    https://github.com/nodejs/node/issues/47130
+
+    For example, running repeatedly "node lib/replay-session.js -q --username XXX --password XXX --filter availability/ https://SERVER"
+    fails always within the first 20 cycles.
+
+    This doesn't seem to affect type-service performance, so keepAlive was disabled also for http for the sake of uniformity.
+
+    Open questions:
+    - Why this appeared only after moving to Rahti 2, when we have used keepAlive already in Rahti 1?
+    - Why his doesn't happen locally? Possible reasons: http instead of https, no ha-proxy or shorter ping.
+    - Why this is only problem in NodeJS and not in other clients?
+    */
+    (http.globalAgent as any).keepAlive = false;
+    (https.globalAgent as any).keepAlive = false;
 
     if (isClient) {
       this.setServiceLocatorUri(serviceLocatorUri);
@@ -757,7 +774,10 @@ export class RestClient {
     logger.debug("get()", uri + " " + JSON.stringify(options.headers));
 
     return this.request("GET", uri, headers).pipe(
-      map((data) => this.handleResponse(data))
+      map((data) => this.handleResponse(data)),
+      catchError((err) => {
+        throw this.requestError("GET", uri, err);
+      })
     );
   }
 
@@ -772,14 +792,20 @@ export class RestClient {
     };
     logger.debug("post()", uri + " " + JSON.stringify(options.headers));
     return this.request("POST", uri, headers, body).pipe(
-      map((data) => this.handleResponse(data))
+      map((data) => this.handleResponse(data)),
+      catchError((err) => {
+        throw this.requestError("POST", uri, err);
+      })
     );
   }
 
   put(uri: string, headers?: Object, body?: string): Observable<string | null> {
     logger.debug("put()", uri + " " + JSON.stringify(headers));
     return this.request("PUT", uri, headers, body).pipe(
-      map((data) => this.handleResponse(data))
+      map((data) => this.handleResponse(data)),
+      catchError((err) => {
+        throw this.requestError("PUT", uri, err);
+      })
     );
   }
 
@@ -800,9 +826,20 @@ export class RestClient {
   }
 
   delete(uri: string, headers?: Object): Observable<any> {
+    logger.debug("delete()", uri + " " + JSON.stringify(headers));
     return this.request("DELETE", uri, headers).pipe(
-      map((data) => this.handleResponse(data))
+      map((data) => this.handleResponse(data)),
+      catchError((err) => {
+        throw this.requestError("DELETE", uri, err);
+      })
     );
+  }
+
+  // connection errors, like "socket hang up"
+  requestError(method: string, uri: string, err: Error): Error {
+    const msg = "request failed: " + method + " " + uri + " " + err;
+    logger.error(msg);
+    return new errors.RestError(msg);
   }
 
   handleResponse(data: HttpResponse): string | null {
