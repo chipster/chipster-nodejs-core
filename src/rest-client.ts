@@ -774,10 +774,10 @@ export class RestClient {
     logger.debug("get()", uri + " " + JSON.stringify(options.headers));
 
     return this.request("GET", uri, headers).pipe(
-      map((data) => this.handleResponse(data)),
       catchError((err) => {
         throw this.requestError("GET", uri, err);
-      })
+      }),
+      map((data) => this.handleResponse(data))
     );
   }
 
@@ -792,20 +792,20 @@ export class RestClient {
     };
     logger.debug("post()", uri + " " + JSON.stringify(options.headers));
     return this.request("POST", uri, headers, body).pipe(
-      map((data) => this.handleResponse(data)),
       catchError((err) => {
         throw this.requestError("POST", uri, err);
-      })
+      }),
+      map((data) => this.handleResponse(data))
     );
   }
 
   put(uri: string, headers?: Object, body?: string): Observable<string | null> {
     logger.debug("put()", uri + " " + JSON.stringify(headers));
     return this.request("PUT", uri, headers, body).pipe(
-      map((data) => this.handleResponse(data)),
       catchError((err) => {
         throw this.requestError("PUT", uri, err);
-      })
+      }),
+      map((data) => this.handleResponse(data))
     );
   }
 
@@ -828,10 +828,10 @@ export class RestClient {
   delete(uri: string, headers?: Object): Observable<any> {
     logger.debug("delete()", uri + " " + JSON.stringify(headers));
     return this.request("DELETE", uri, headers).pipe(
-      map((data) => this.handleResponse(data)),
       catchError((err) => {
         throw this.requestError("DELETE", uri, err);
-      })
+      }),
+      map((data) => this.handleResponse(data))
     );
   }
 
