@@ -1,6 +1,6 @@
 {
   "name": "chipster-nodejs-core",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "type": "module",
   "private": false,
   "main": "lib/exports.js",
@@ -27,6 +27,6 @@
     "@types/verror": "^1.10.9",
     "@types/yamljs": "^0.2.34",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.5.4"
   }
 }
