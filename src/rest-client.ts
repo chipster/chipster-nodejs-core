@@ -172,7 +172,20 @@ export class RestClient {
 
   packageSession(sessionId: string, file: string) {
     return this.getSessionWorkerUri().pipe(
-      mergeMap((uri) => this.getToFile(uri + "/sessions/" + sessionId, file))
+      mergeMap((uri) =>
+        // postJson() only because it sets the authentication header
+        this.postJson(uri + "/sessions/" + sessionId, this.token, null)
+      ),
+      map((resp_str: any) => {
+        let resp = JSON.parse(resp_str);
+        if (resp.errors.length > 0) {
+          throw new Error(
+            "failed to package session: " + JSON.stringify(resp.errors)
+          );
+        }
+        return resp.datasetId;
+      }),
+      mergeMap((datasetId) => this.downloadFile(sessionId, datasetId, file))
     );
   }
 
