@@ -877,14 +877,23 @@ export class RestClient {
             " " +
             data.response.statusMessage +
             " " +
-            data.response.body
+            data.body
         );
         throw new errors.InternalServerError(
           "request " +
-            data.response.request.method +
+            data.response.req?.method +
             " " +
-            data.response.request.href +
-            " failed"
+            data.response.req?.protocol +
+            "//" +
+            data.response.req?.host +
+            "/" +
+            data.response.req?.path +
+            " failed. " +
+            data.response.statusCode +
+            " " +
+            data.response.statusMessage +
+            ". Response body: " +
+            data.body // body in error repsonses may have more details (and shouldn't be huge or binary)
         );
       }
     }
