@@ -33,13 +33,6 @@ export class Config {
       throw new Error("default config file not found: " + this.defaultConfPath);
     }
 
-    let allDefaults = this.readFile(this.defaultConfPath);
-    for (let key in allDefaults) {
-      if (key.startsWith(VARIABLE_PREFIX)) {
-        this.variables.set(key.replace(VARIABLE_PREFIX, ""), allDefaults[key]);
-      }
-    }
-
     this.confPath = ROOT_PATH + this.getDefault(KEY_CONF_PATH);
     if (!fs.existsSync(this.confPath)) {
       this.confPath = null;
@@ -52,32 +45,48 @@ export class Config {
         // swallow
       }
     }
+
+    let allDefaults = this.readFile(this.defaultConfPath);
+    for (let key in allDefaults) {
+      if (key.startsWith(VARIABLE_PREFIX)) {
+        this.variables.set(
+          key.replace(VARIABLE_PREFIX, ""),
+          this.getWithOptions(key, false)
+        );
+      }
+    }
   }
 
   get(key: string) {
-    let value;
+    return this.getWithOptions(key, true);
+  }
+
+  getWithOptions(key: string, replaceVariables: boolean) {
+    let value: string | undefined = undefined;
     if (this.confPath) {
       let confFile = this.readFile(this.confPath);
       if (confFile) {
         value = confFile[key];
       }
     }
-    if (!value) {
+    if (value == null) {
       value = this.getDefault(key);
     }
 
-    if (!value) {
+    if (value == null) {
       throw new Error("configuration key " + key + " not found");
+    }
+
+    if (replaceVariables) {
+      this.variables.forEach((variableValue, variableKey) => {
+        value = value?.replace("{{" + variableKey + "}}", variableValue);
+      });
     }
     return value;
   }
 
   getDefault(key: string) {
     let template = this.readFile(this.defaultConfPath)[key];
-
-    this.variables.forEach((variableValue, variableKey) => {
-      template = template.replace("{{" + variableKey + "}}", variableValue);
-    });
 
     return template;
   }
