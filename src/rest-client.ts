@@ -22,7 +22,7 @@ import { fileURLToPath } from "url";
 
 import fs from "fs";
 import errors from "restify-errors";
-import YAML from "yamljs";
+import { parse } from "yaml";
 import http from "http";
 import https from "https";
 
@@ -38,7 +38,7 @@ export class RestClient {
     private isClient: boolean,
     token: string,
     serviceLocatorUri: string,
-    private isQuiet = false
+    private isQuiet = false,
   ) {
     /*
     Requests are failing randomly with error "socket hung up" when keepAlive is enabled.
@@ -66,7 +66,7 @@ export class RestClient {
     } else {
       this.config = new Config();
       this.serviceLocatorUri = this.config.get(
-        Config.KEY_URL_INT_SERVICE_LOCATOR
+        Config.KEY_URL_INT_SERVICE_LOCATOR,
       );
     }
 
@@ -97,16 +97,16 @@ export class RestClient {
     return authUri$.pipe(
       map((authUri) => authUri + "/tokens/"),
       mergeMap((uri: string) =>
-        this.post(uri, this.getBasicAuthHeader(username, password))
-      )
+        this.post(uri, this.getBasicAuthHeader(username, password)),
+      ),
     );
   }
 
   getAuthPublicKey(username: string, token: string): Observable<string | null> {
     return this.getAuthUri().pipe(
       mergeMap((authUri) =>
-        this.getWithToken(authUri + "/tokens/publicKey", token)
-      )
+        this.getWithToken(authUri + "/tokens/publicKey", token),
+      ),
     );
   }
   getStatus(host: string): Observable<any> {
@@ -116,33 +116,33 @@ export class RestClient {
   getSessions(): Observable<Session[]> {
     return this.getSessionDbUri().pipe(
       mergeMap((sessionDbUri) =>
-        this.getJson(sessionDbUri + "/sessions/", this.token)
-      )
+        this.getJson(sessionDbUri + "/sessions/", this.token),
+      ),
     );
   }
 
   getExampleSessions(app: string): Observable<Session[]> {
     return this.getSessionDbUri().pipe(
       mergeMap((sessionDbUri) =>
-        this.getJson(sessionDbUri + "/sessions?appId=" + app, this.token)
-      )
+        this.getJson(sessionDbUri + "/sessions?appId=" + app, this.token),
+      ),
     );
   }
 
   getSession(sessionId: string): Observable<Session> {
     return this.getSessionDbUri().pipe(
       mergeMap((sessionDbUri) =>
-        this.getJson(sessionDbUri + "/sessions/" + sessionId, this.token)
-      )
+        this.getJson(sessionDbUri + "/sessions/" + sessionId, this.token),
+      ),
     );
   }
 
   postSession(session: Session) {
     return this.getSessionDbUri().pipe(
       mergeMap((sessionDbUri) =>
-        this.postJson(sessionDbUri + "/sessions/", this.token, session)
+        this.postJson(sessionDbUri + "/sessions/", this.token, session),
       ),
-      map((resp: any) => JSON.parse(resp).sessionId)
+      map((resp: any) => JSON.parse(resp).sessionId),
     );
   }
 
@@ -152,9 +152,9 @@ export class RestClient {
         this.putJson(
           sessionDbUri + "/sessions/" + session.sessionId,
           this.token,
-          session
-        )
-      )
+          session,
+        ),
+      ),
     );
   }
 
@@ -164,9 +164,9 @@ export class RestClient {
         this.postJson(
           uri + "/sessions/" + sessionId + "/datasets/" + datasetId,
           this.token,
-          null
-        )
-      )
+          null,
+        ),
+      ),
     );
   }
 
@@ -174,18 +174,18 @@ export class RestClient {
     return this.getSessionWorkerUri().pipe(
       mergeMap((uri) =>
         // postJson() only because it sets the authentication header
-        this.postJson(uri + "/sessions/" + sessionId, this.token, null)
+        this.postJson(uri + "/sessions/" + sessionId, this.token, null),
       ),
       map((resp_str: any) => {
         let resp = JSON.parse(resp_str);
         if (resp.errors.length > 0) {
           throw new Error(
-            "failed to package session: " + JSON.stringify(resp.errors)
+            "failed to package session: " + JSON.stringify(resp.errors),
           );
         }
         return resp.datasetId;
       }),
-      mergeMap((datasetId) => this.downloadFile(sessionId, datasetId, file))
+      mergeMap((datasetId) => this.downloadFile(sessionId, datasetId, file)),
     );
   }
 
@@ -194,9 +194,9 @@ export class RestClient {
       mergeMap((sessionDbUri) =>
         this.deleteWithToken(
           sessionDbUri + "/sessions/" + sessionId,
-          this.token
-        )
-      )
+          this.token,
+        ),
+      ),
     );
   }
 
@@ -205,9 +205,9 @@ export class RestClient {
       mergeMap((sessionDbUri) => {
         return this.getJson(
           sessionDbUri + "/sessions/" + sessionId + "/datasets/",
-          this.token
+          this.token,
         );
-      })
+      }),
     );
   }
 
@@ -216,9 +216,9 @@ export class RestClient {
       mergeMap((sessionDbUri) => {
         return this.getJson(
           sessionDbUri + "/sessions/" + sessionId + "/datasets/" + datasetId,
-          this.token
+          this.token,
         );
-      })
+      }),
     );
   }
 
@@ -227,9 +227,9 @@ export class RestClient {
       mergeMap((sessionDbUri) =>
         this.deleteWithToken(
           sessionDbUri + "/sessions/" + sessionId + "/datasets/" + datasetId,
-          this.token
-        )
-      )
+          this.token,
+        ),
+      ),
     );
   }
 
@@ -239,10 +239,10 @@ export class RestClient {
         this.postJson(
           sessionDbUri + "/sessions/" + sessionId + "/datasets/",
           this.token,
-          dataset
-        )
+          dataset,
+        ),
       ),
-      map((resp: any) => JSON.parse(resp).datasetId)
+      map((resp: any) => JSON.parse(resp).datasetId),
     );
   }
 
@@ -256,9 +256,9 @@ export class RestClient {
             "/datasets/" +
             dataset.datasetId,
           this.token,
-          dataset
-        )
-      )
+          dataset,
+        ),
+      ),
     );
   }
 
@@ -267,9 +267,9 @@ export class RestClient {
       mergeMap((sessionDbUri) => {
         return this.getJson(
           sessionDbUri + "/sessions/" + sessionId + "/jobs/",
-          this.token
+          this.token,
         );
-      })
+      }),
     );
   }
 
@@ -278,9 +278,9 @@ export class RestClient {
       mergeMap((sessionDbUri) => {
         return this.getJson(
           sessionDbUri + "/sessions/" + sessionId + "/jobs/" + jobId,
-          this.token
+          this.token,
         );
-      })
+      }),
     );
   }
 
@@ -290,10 +290,10 @@ export class RestClient {
         this.postJson(
           sessionDbUri + "/sessions/" + sessionId + "/jobs/",
           this.token,
-          job
-        )
+          job,
+        ),
       ),
-      map((resp: any) => JSON.parse(resp).jobId)
+      map((resp: any) => JSON.parse(resp).jobId),
     );
   }
 
@@ -303,9 +303,9 @@ export class RestClient {
         this.putJson(
           sessionDbUri + "/sessions/" + sessionId + "/jobs/" + job.jobId,
           this.token,
-          job
-        )
-      )
+          job,
+        ),
+      ),
     );
   }
 
@@ -314,9 +314,9 @@ export class RestClient {
       mergeMap((sessionDbUri) =>
         this.deleteWithToken(
           sessionDbUri + "/sessions/" + sessionId + "/jobs/" + jobId,
-          this.token
-        )
-      )
+          this.token,
+        ),
+      ),
     );
   }
 
@@ -326,7 +326,7 @@ export class RestClient {
         job.state = JobState.Cancelled;
         job.stateDetail = "";
         return this.putJob(sessionId, job);
-      })
+      }),
     );
   }
 
@@ -334,14 +334,14 @@ export class RestClient {
     return this.getToolboxUri().pipe(
       mergeMap((uri) => {
         return this.getJson(uri + "/modules/", null);
-      })
+      }),
     );
   }
 
   getTool(toolId: string): Observable<Tool> {
     return this.getToolboxUri().pipe(
       mergeMap((uri) => this.getJson(uri + "/tools/" + toolId, null)),
-      map((toolBoxTool: any) => toolBoxTool.sadlDescription)
+      map((toolBoxTool: any) => toolBoxTool.sadlDescription),
     );
   }
 
@@ -350,9 +350,9 @@ export class RestClient {
       mergeMap((fileBrokerUri) =>
         this.getToFile(
           fileBrokerUri + "/sessions/" + sessionId + "/datasets/" + datasetId,
-          file
-        )
-      )
+          file,
+        ),
+      ),
     );
   }
 
@@ -361,16 +361,16 @@ export class RestClient {
       mergeMap((sessionDbUri) =>
         this.getJson(
           sessionDbUri + "/sessions/" + sessionId + "/rules",
-          this.token
-        )
-      )
+          this.token,
+        ),
+      ),
     );
   }
 
   postRule(
     sessionId: string,
     username: string,
-    readWrite: boolean
+    readWrite: boolean,
   ): Observable<any> {
     let rule = {
       session: { sessionId: sessionId },
@@ -382,9 +382,9 @@ export class RestClient {
         this.postJson(
           sessionDbUri + "/sessions/" + sessionId + "/rules",
           this.token,
-          rule
-        )
-      )
+          rule,
+        ),
+      ),
     );
   }
 
@@ -393,9 +393,9 @@ export class RestClient {
       mergeMap((sessionDbUri) =>
         this.deleteWithToken(
           sessionDbUri + "/sessions/" + sessionId + "/rules/" + ruleId,
-          this.token
-        )
-      )
+          this.token,
+        ),
+      ),
     );
   }
 
@@ -416,9 +416,9 @@ export class RestClient {
         return this.getWithToken(
           fileBrokerUri + "/sessions/" + sessionId + "/datasets/" + datasetId,
           this.token,
-          { Range: "bytes=0-" + maxLength }
+          { Range: "bytes=0-" + maxLength },
         );
-      })
+      }),
     );
   }
 
@@ -474,7 +474,7 @@ export class RestClient {
   getServicesUncached() {
     this.info("get public services from " + this.serviceLocatorUri);
     return this.getJson(this.serviceLocatorUri + "/services", null).pipe(
-      tap((services) => (this.services = services))
+      tap((services) => (this.services = services)),
     );
   }
 
@@ -482,7 +482,7 @@ export class RestClient {
     this.info("get internal services from " + this.serviceLocatorUri);
     return this.getJson(
       this.serviceLocatorUri + "/services/internal",
-      this.token
+      this.token,
     );
   }
 
@@ -490,7 +490,7 @@ export class RestClient {
     this.info("get internal auth address from " + this.serviceLocatorUri);
     return this.get(
       this.serviceLocatorUri + "/services/internal",
-      this.getBasicAuthHeader(username, password)
+      this.getBasicAuthHeader(username, password),
     ).pipe(
       map((data: string | null) => {
         if (data != null) {
@@ -505,7 +505,7 @@ export class RestClient {
           return auths[0];
         }
         throw new Error("not auths found");
-      })
+      }),
     );
   }
 
@@ -513,16 +513,16 @@ export class RestClient {
     return this.getServices().pipe(
       map((services: Service[]) => {
         let service = services.filter(
-          (service) => service.role === serviceName
+          (service) => service.role === serviceName,
         )[0];
         if (!service) {
           observableThrowError(
-            new errors.InternalServerError("service not found" + serviceName)
+            new errors.InternalServerError("service not found" + serviceName),
           );
         }
 
         return this.isClient ? service.publicUri : service.uri;
-      })
+      }),
     );
   }
 
@@ -531,12 +531,12 @@ export class RestClient {
       map((resp) => {
         let body = this.handleResponse(resp);
         if (body != null) {
-          let conf = YAML.parse(body);
+          let conf = parse(body);
           return conf["service-locator"];
         } else {
           return null;
         }
-      })
+      }),
     );
   }
 
@@ -552,7 +552,7 @@ export class RestClient {
     method: string,
     uri: string,
     headers?: Object,
-    body?: string
+    body?: string,
   ): Observable<HttpResponse> {
     let subject = new Subject<HttpResponse>();
 
@@ -638,7 +638,7 @@ export class RestClient {
               response: response,
               body: errorBody,
               uri: uri,
-            })
+            }),
           );
         } else {
           subject.next(null);
@@ -727,7 +727,7 @@ export class RestClient {
                   response: response,
                   body: body,
                   uri: uri,
-                })
+                }),
               );
             } else {
               subject.next(datasetId);
@@ -740,7 +740,7 @@ export class RestClient {
           });
         });
         return subject;
-      })
+      }),
     );
   }
 
@@ -752,14 +752,14 @@ export class RestClient {
         } else {
           return null;
         }
-      })
+      }),
     );
   }
 
   getWithToken(
     uri: string,
     token: string | null,
-    headers?: Object
+    headers?: Object,
   ): Observable<string | null> {
     if (token) {
       return this.get(uri, this.getBasicAuthHeader("token", token, headers));
@@ -790,14 +790,14 @@ export class RestClient {
       catchError((err) => {
         throw this.requestError("GET", uri, err);
       }),
-      map((data) => this.handleResponse(data))
+      map((data) => this.handleResponse(data)),
     );
   }
 
   post(
     uri: string,
     headers?: Object,
-    body?: string
+    body?: string,
   ): Observable<string | null> {
     let options = {
       headers: headers,
@@ -808,7 +808,7 @@ export class RestClient {
       catchError((err) => {
         throw this.requestError("POST", uri, err);
       }),
-      map((data) => this.handleResponse(data))
+      map((data) => this.handleResponse(data)),
     );
   }
 
@@ -818,7 +818,7 @@ export class RestClient {
       catchError((err) => {
         throw this.requestError("PUT", uri, err);
       }),
-      map((data) => this.handleResponse(data))
+      map((data) => this.handleResponse(data)),
     );
   }
 
@@ -844,7 +844,7 @@ export class RestClient {
       catchError((err) => {
         throw this.requestError("DELETE", uri, err);
       }),
-      map((data) => this.handleResponse(data))
+      map((data) => this.handleResponse(data)),
     );
   }
 
@@ -867,7 +867,7 @@ export class RestClient {
             " " +
             data.response.statusMessage +
             " " +
-            data.response.body
+            data.response.body,
         );
         throw this.responseToError(data);
       } else {
@@ -877,7 +877,7 @@ export class RestClient {
             " " +
             data.response.statusMessage +
             " " +
-            data.body
+            data.body,
         );
         throw new errors.InternalServerError(
           "request " +
@@ -893,7 +893,7 @@ export class RestClient {
             " " +
             data.response.statusMessage +
             ". Response body: " +
-            data.body // body in error repsonses may have more details (and shouldn't be huge or binary)
+            data.body, // body in error repsonses may have more details (and shouldn't be huge or binary)
         );
       }
     }
@@ -923,7 +923,7 @@ export class RestClient {
           httpResponse: httpResponse,
         },
       },
-      message
+      message,
     );
   }
 }

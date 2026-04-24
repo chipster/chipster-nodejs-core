@@ -1,7 +1,7 @@
 import { Logger } from "./logger.js";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import YAML from "yamljs";
+import { parse } from "yaml";
 
 const logger = Logger.getLogger(fileURLToPath(import.meta.url));
 
@@ -38,7 +38,7 @@ export class Config {
       this.confPath = null;
       if (!Config.confFileWarnShown) {
         logger.warn(
-          "configuration file " + this.confPath + " not found, using defaults"
+          "configuration file " + this.confPath + " not found, using defaults",
         );
         Config.confFileWarnShown = true;
       } else {
@@ -51,7 +51,7 @@ export class Config {
       if (key.startsWith(VARIABLE_PREFIX)) {
         this.variables.set(
           key.replace(VARIABLE_PREFIX, ""),
-          this.getWithOptions(key, false)
+          this.getWithOptions(key, false),
         );
       }
     }
@@ -92,6 +92,7 @@ export class Config {
   }
 
   readFile(filePath: string) {
-    return YAML.load(filePath);
+    const file = fs.readFileSync(filePath, "utf8");
+    return parse(file);
   }
 }
